@@ -15,18 +15,18 @@ function usage() {
 } 
 
 function check_memory() {
-	# Enterprise server 4G,  forwarder  500M 
-	# Rough estimation :  4 * 1024  + FORWARDER_NUM * 500M  < 80% of HOST_MEMORY
+	# Enterprise server 4G,  forwarder  300M 
+	# Rough estimation :  4 * 1024  + FORWARDER_NUM * 300M  < 80% of HOST_MEMORY
 
 	HOST_MEMORY=`free -m | grep ^Mem: | awk '{ print $2 }'` 
 
-	let "NEED=4*1024 + FORWARDERS*500"
+	let "NEED=4*1024 + FORWARDERS*300"
 	
 	let "LIMIT=4*HOST_MEMORY/5"
 	
 	if [ $NEED -gt $LIMIT ]; then
 		printf "= Host OS memory is not enougth! \n"
-		printf "= Expect 4G for Splunk Enterprise Server, 500M for every forwarder \n"
+		printf "= Expect 4G for Splunk Enterprise Server, 300M for every forwarder \n"
 		printf "= Need memory %s M \n" "$NEED"
 		printf "= Host OS 80 percent memory limiation  %s M \n" "$LIMIT"
 		printf "\n"
@@ -64,6 +64,7 @@ function service_port_check() {
 function volumes_compose() {
 	printf "version: \'2.0\' \n" 
 	printf "volumes: \n" 
+	printf "    Startup-Order: \n"
 	printf "    opt-splunk-etc: \n"
 	printf "    opt-splunk-var: \n"
 
@@ -84,10 +85,18 @@ function splunkenterprise_compose() {
     	printf "        environment: \n"
     	printf "          SPLUNK_START_ARGS: --accept-license --answer-yes \n"
       	printf "          SPLUNK_ENABLE_DEPLOY_SERVER: 'true' \n"
-	printf "          SPLUNK_ENABLE_LISTEN: 9997 \n"
+	#printf "          SPLUNK_ENABLE_LISTEN: 9997 \n"
     	printf "        volumes: \n"
       	printf "          - /data/splunk/opt-splunk-etc:/opt/splunk/etc \n"
         printf "          - /data/splunk/opt-splunk-var:/opt/splunk/var \n"
+        printf "          - /data/Startup-Order:/Startup-Order \n"
+	printf "        command: |\n"
+        printf "          /bin/bash -c '\n"
+        printf "          rm -fr /Start-Order/*;\n"
+        printf "          echo Service splunkenterprise  Start;\n"
+	printf "          sleep 10;\n"
+        printf "          touch /Startup-Order/splunkenterprise;\n"
+        printf "          /sbin/entrypoint.sh start-service'\n"
     	printf "        ports: \n"
 	printf "          - \"8000:8000\" \n"
 	printf "          - \"9997:9997\" \n"
@@ -100,12 +109,33 @@ function forwarder_compose() {
 	printf "        container_name: forwarder-%s \n" "$index"
     	printf "        hostname: forwarder-%s-docker \n" "$index"
 	if [ $index -eq 1 ]; then
-    		printf "        depends_on: \n"
-    		printf "          - \"splunkenterprise\" \n"
+    		#printf "        depends_on: \n"
+    		#printf "          - \"splunkenterprise\" \n"
+		printf "        command: |\n"
+        	printf "          /bin/bash -c '\n"
+      		printf "          while [[ ! -f /Startup-Order/splunkenterprise ]]; do sleep 1; done;\n"
+        	printf "          echo Service forwarder-1 Start;\n"
+        	printf "          sleep 5;\n"
+        	printf "          touch /Startup-Order/forwarder-1;\n"
+        	printf "          /sbin/entrypoint.sh start-service'\n"
+
 	else 
 		let "depend = index - 1"
-		printf "        depends_on: \n"
-    		printf "          - \"forwarder-%s\" \n" "$depend"
+		#printf "        depends_on: \n"
+    		#printf "          - \"forwarder-%s\" \n" "$depend"
+		printf "        command: |\n"
+        	printf "          /bin/bash -c '\n"
+      		printf "          while [[ ! -f /Startup-Order/splunkenterprise ]]; do sleep 1; done;\n"
+		for(( i=1; i<index ; i++))
+		do
+      			printf "          while [[ ! -f /Startup-Order/forwarder-%s ]]; do sleep 1; done;\n" "$i" "$i"
+		done
+        	printf "          echo Service forwarder-%s Start;\n" "$index"
+		let "wait_time = 5 + index*3"
+        	printf "          sleep %s;\n" "$wait_time"
+        	printf "          touch /Startup-Order/forwarder-%s;\n" "$index"
+        	printf "          /sbin/entrypoint.sh start-service'\n"
+
 	fi	
     	printf "        environment: \n"
     	printf "          SPLUNK_START_ARGS: --accept-license --answer-yes \n"
@@ -119,6 +149,7 @@ function forwarder_compose() {
     	printf "        volumes: \n"
       	printf "          - /data/forwarder-%s/opt-forwarder-%s-etc:/opt/splunk/etc \n" "$index" "$index"
         printf "          - /data/forwarder-%s/opt-forwarder-%s-var:/opt/splunk/var \n" "$index" "$index"
+        printf "          - /data/Startup-Order:/Startup-Order \n"
     	printf "        ports: \n"
 	printf "          - \"%s:%s\" \n" "$forwarder_port" "$forwarder_port"
 }

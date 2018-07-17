@@ -7,6 +7,7 @@ volumes:
   opt-forwarder-1-var:
   opt-forwarder-2-etc:
   opt-forwarder-2-var:
+  Startup-Order:
 
 services:
   splunkenterprise:
@@ -20,6 +21,17 @@ services:
     volumes:
       - /data/splunk/opt-splunk-etc:/opt/splunk/etc
       - /data/splunk/opt-splunk-var:/opt/splunk/var
+      - /data/Startup-Order:/Startup-Order
+
+    command: |
+      /bin/bash -c '
+      rm -fr /Startup-Order/*
+      echo Service splunkenterprise  Start;
+      sleep 10;
+      echo Service splunkenterprise  Up;
+      touch /Startup-Order/splunkenterprise;
+      /sbin/entrypoint.sh start-service'
+
     ports:
       - "8000:8000"
       - "9997:9997"
@@ -37,6 +49,16 @@ services:
     volumes:
       - /data/forwarder-1/opt-forwarder-1-etc:/opt/splunk/etc
       - /data/forwarder-1/opt-forwarder-1-var:/opt/splunk/var
+      - /data/Startup-Order:/Startup-Order
+    command: |
+      /bin/bash -c '
+      while [[ ! -f /Startup-Order/splunkenterprise ]]; do sleep 1; done;
+      echo Service forwarder-1 Start;
+      sleep 10;
+      echo Service forwarder-1 Up;
+      touch /Startup-Order/forwarder-1;
+      /sbin/entrypoint.sh start-service'
+
     ports:
       - "10001:10001"
 
@@ -53,6 +75,16 @@ services:
     volumes:
       - /data/forwarder-2/opt-forwarder-2-etc:/opt/splunk/etc
       - /data/forwarder-2/opt-forwarder-2-var:/opt/splunk/var
+      - /data/Startup-Order:/Startup-Order
+    command: |
+      /bin/bash -c '
+      while [[ ! -f /Startup-Order/splunkenterprise ]]; do sleep 1; done;
+      while [[ ! -f /Startup-Order/forwarder-1 ]]; do sleep 1; done;
+      sleep 10;
+      echo Service forwarder-2 Up;
+      touch /Startup-Order/forwarder-2;
+      /sbin/entrypoint.sh start-service'
+
     ports:
       - "10002:10002"
 
