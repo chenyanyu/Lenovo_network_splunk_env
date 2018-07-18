@@ -104,6 +104,7 @@ function splunkenterprise_compose() {
 
 
 function forwarder_compose() {
+	index=$1
 	printf "    forwarder-%s: \n" "$index"
 	printf "        image: ospost/lenovo-splunk-forwarder:%s \n" "$version"
 	printf "        container_name: forwarder-%s \n" "$index"
@@ -120,15 +121,16 @@ function forwarder_compose() {
         	printf "          /sbin/entrypoint.sh start-service'\n"
 
 	else 
-		let "depend = index - 1"
+		#let "depend = index - 1"
 		#printf "        depends_on: \n"
     		#printf "          - \"forwarder-%s\" \n" "$depend"
 		printf "        command: |\n"
         	printf "          /bin/bash -c '\n"
       		printf "          while [[ ! -f /Startup-Order/splunkenterprise ]]; do sleep 1; done;\n"
 		for(( i=1; i<index ; i++))
+		#for i in $(seq 1 $index)
 		do
-      			printf "          while [[ ! -f /Startup-Order/forwarder-%s ]]; do sleep 1; done;\n" "$i" "$i"
+      			printf "          while [[ ! -f /Startup-Order/forwarder-%s ]]; do sleep 1; done;\n" "$i"
 		done
         	printf "          echo Service forwarder-%s Start;\n" "$index"
 		let "wait_time = 5 + index*3"
@@ -183,11 +185,12 @@ service_port_check
 volumes_compose > $2
 splunkenterprise_compose >> $2
 
-for(( index=1; index<=FORWARDERS ; index++))
+for(( forwarder=1; forwarder<=FORWARDERS ; forwarder++))
 do
-	forwarder_compose >> $2
+	forwarder_compose $forwarder >> $2
 done
 
 printf  "docker compose file \'%s\' generating ...  Done \n\n"  "$2"
 
-	
+
+
