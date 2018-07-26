@@ -48,7 +48,7 @@ function service_port_check() {
 	# default splunk mangement purpose service port 8089		Optional 
 	# default Splunk server recieving port 		9997		Optional  Not need in Phase 1
 
-	HOST_PORT_USED=`netstat -tuln | grep ::: | awk '{ print $4 }' | sed  s/::://g` 
+	HOST_PORT_USED=`netstat -tuln  | grep ^[t,u] | awk '{ print $4 }' | sed  's/:/ /g' | awk '{ print $NF }'`
 
 	for PORT in $HOST_PORT_USED
 	do
@@ -94,7 +94,7 @@ function splunkenterprise_compose() {
         printf "          /bin/bash -c '\n"
         printf "          rm -fr /Start-Order/*;\n"
         printf "          echo Service splunkenterprise  Start;\n"
-	printf "          sleep 10;\n"
+	printf "          sleep 15;\n"
         printf "          touch /Startup-Order/splunkenterprise;\n"
         printf "          /sbin/entrypoint.sh start-service'\n"
     	printf "        ports: \n"
@@ -116,7 +116,7 @@ function forwarder_compose() {
         	printf "          /bin/bash -c '\n"
       		printf "          while [[ ! -f /Startup-Order/splunkenterprise ]]; do sleep 1; done;\n"
         	printf "          echo Service forwarder-1 Start;\n"
-        	printf "          sleep 5;\n"
+        	printf "          sleep 15;\n"
         	printf "          touch /Startup-Order/forwarder-1;\n"
         	printf "          /sbin/entrypoint.sh start-service'\n"
 
@@ -133,7 +133,7 @@ function forwarder_compose() {
       			printf "          while [[ ! -f /Startup-Order/forwarder-%s ]]; do sleep 1; done;\n" "$i"
 		done
         	printf "          echo Service forwarder-%s Start;\n" "$index"
-		let "wait_time = 5 + index*3"
+		let "wait_time = 15 + index*5"
         	printf "          sleep %s;\n" "$wait_time"
         	printf "          touch /Startup-Order/forwarder-%s;\n" "$index"
         	printf "          /sbin/entrypoint.sh start-service'\n"
